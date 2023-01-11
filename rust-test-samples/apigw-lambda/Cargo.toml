@@ -1,0 +1,21 @@
+[package]
+name = "apigw-lambda"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luca Mezzalira <lmezza@amazon.com>"]
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aws-config = "0.52.0"
+aws-smithy-client = { version = "0.53.0", features = ["test-util"] }
+lambda_http = "0.7.2"
+serde_derive = "1.0.152"
+serde_json = "1.0.91"
+tokio = { version = "1.21.1", features = ["full"] }
+
+[dev-dependencies]
+aws-smithy-http = "0.53.0"
+aws-types = { version = "0.52.0", features = ["hardcoded-credentials"] }
+http = "0.2.8"
