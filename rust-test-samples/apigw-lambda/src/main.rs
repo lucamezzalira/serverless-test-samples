@@ -1,10 +1,16 @@
-use lambda_http::{service_fn, Body, Error, Request, RequestExt, Response};
+use lambda_http::{service_fn, Body, Error, Request, Response};
+use aws_sdk_s3::{Client};
+
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     
+    const REGION: &str = "eu-west-1";
+    let shared_config = aws_config::from_env().region(REGION).load().await;
+    let client = Client::new(&shared_config);
+
     lambda_http::run(service_fn(|request: Request| {
-        get_s3_buckets_list(request)
+        get_s3_buckets_list(request, &client)
     }))
     .await?;
 
@@ -12,9 +18,17 @@ async fn main() -> Result<(), Error> {
 }
 
 async fn get_s3_buckets_list(
-    request: Request,
+    request: Request, client: &Client
 ) -> Result<Response<Body>, Error> {
-    Ok(Response::builder().status(200).body("bucket list".into())?)
+
+    let resp = client.list_buckets().send().await?;
+    let buckets = resp.buckets().unwrap_or_default();
+    
+    for bucket in buckets {
+        println!("{}", bucket.name().unwrap_or_default());
+    }
+
+    Ok(Response::builder().status(200).body("body".into())?)
     //let res -> to implement
     // match res {
     //     Ok(_) => Ok(Response::builder()
