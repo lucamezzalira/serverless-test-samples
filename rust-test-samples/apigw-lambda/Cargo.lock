@@ -22,6 +22,7 @@ dependencies = [
  "aws-types",
  "http",
  "lambda_http",
+ "serde",
  "serde_derive",
  "serde_json",
  "tokio",

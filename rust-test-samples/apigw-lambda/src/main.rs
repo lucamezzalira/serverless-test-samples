@@ -1,44 +1,50 @@
-use lambda_http::{service_fn, Body, Error, Request, Response};
+use lambda_http::{run, service_fn, http::StatusCode, IntoResponse, Request, Error, Response};
 use aws_sdk_s3::{Client};
+use serde::{Serialize};
+use serde_json::json;
 
+#[derive(Serialize, Debug)]
+struct Message {
+    list: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    
+
     const REGION: &str = "eu-west-1";
     let shared_config = aws_config::from_env().region(REGION).load().await;
     let client = Client::new(&shared_config);
 
-    lambda_http::run(service_fn(|request: Request| {
-        get_s3_buckets_list(request, &client)
+    run(service_fn(|_request: Request| {
+        handler(&client)
     }))
     .await?;
 
     Ok(())
+
 }
 
-async fn get_s3_buckets_list(
-    request: Request, client: &Client
-) -> Result<Response<Body>, Error> {
+async fn handler(client: &Client) -> Result<impl IntoResponse, Error> {
 
-    let resp = client.list_buckets().send().await?;
-    let buckets = resp.buckets().unwrap_or_default();
+    let s3_buckets = client.list_buckets().send().await?;
+    let s3_result = match s3_buckets.buckets {
+        Some(_) => s3_buckets.buckets(),
+        None => return Ok(Response::builder().status(500).body("s3 call failed".into())?),
+    };
     
+    let buckets = s3_result.unwrap_or_default();
+    let mut buckets_list = vec![];
+
     for bucket in buckets {
-        println!("{}", bucket.name().unwrap_or_default());
+        buckets_list.push(bucket.name().unwrap_or_default());
     }
 
-    Ok(Response::builder().status(200).body("body".into())?)
-    //let res -> to implement
-    // match res {
-    //     Ok(_) => Ok(Response::builder()
-    //                                     .status(200)
-    //                                     .body("bucket list".into())?),
-    //     Err(_) => Ok(Response::builder()
-    //                                     .status(500)
-    //                                     .body("internal error".into())?),
-    // }
+    let response = Message {list: buckets_list.join(" | ")};
+
+    Ok(Response::builder().status(StatusCode::OK).body(json!(&response).to_string())?)
+
 }
+
 
 /*#[cfg(test)]
 mod tests {
