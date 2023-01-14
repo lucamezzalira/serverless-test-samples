@@ -5,7 +5,7 @@ use serde_json::json;
 
 #[derive(Serialize, Debug)]
 struct Message {
-    list: String,
+    list: Vec<String>,
 }
 
 #[tokio::main]
@@ -18,10 +18,7 @@ async fn main() -> Result<(), Error> {
     run(service_fn(|_request: Request| {
         handler(&client)
     }))
-    .await?;
-
-    Ok(())
-
+    .await
 }
 
 async fn handler(client: &Client) -> Result<impl IntoResponse, Error> {
@@ -36,14 +33,20 @@ async fn handler(client: &Client) -> Result<impl IntoResponse, Error> {
     let mut buckets_list = vec![];
 
     for bucket in buckets {
-        buckets_list.push(bucket.name().unwrap_or_default());
+        buckets_list.push(bucket
+                            .name().
+                            unwrap_or_default()
+                            .to_string());
     }
 
-    let response = Message {list: buckets_list.join(" | ")};
+    let response = Message {list: buckets_list};
 
     Ok(Response::builder().status(StatusCode::OK).body(json!(&response).to_string())?)
 
 }
+
+// check book Palmieri
+// external test folder example: https://github.com/awsdocs/aws-doc-sdk-examples/tree/main/rust_dev_preview/s3/tests
 
 
 /*#[cfg(test)]
