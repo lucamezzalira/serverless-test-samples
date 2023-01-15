@@ -1,3 +1,4 @@
+use aws_config::meta::region::RegionProviderChain;
 use lambda_http::{run, service_fn, http::StatusCode, IntoResponse, Request, Error, Response};
 use aws_sdk_s3::{Client};
 use serde::{Serialize};
@@ -5,16 +6,17 @@ use serde_json::json;
 
 #[derive(Serialize, Debug)]
 struct Message {
-    list: Vec<String>,
+    list: String,
 }
+
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-
-    const REGION: &str = "eu-west-1";
-    let shared_config = aws_config::from_env().region(REGION).load().await;
-    let client = Client::new(&shared_config);
-
+    
+    let region_provider = RegionProviderChain::default_provider().or_else("eu-west-1");
+    let config = aws_config::from_env().region(region_provider).load().await;
+    let client = Client::new(&config);
+    
     run(service_fn(|_request: Request| {
         handler(&client)
     }))
@@ -35,33 +37,46 @@ async fn handler(client: &Client) -> Result<impl IntoResponse, Error> {
     for bucket in buckets {
         buckets_list.push(bucket
                             .name().
-                            unwrap_or_default()
-                            .to_string());
+                            unwrap_or_default());
     }
 
-    let response = Message {list: buckets_list};
+    let response = Message {list: buckets_list.join(" | ")};
 
     Ok(Response::builder().status(StatusCode::OK).body(json!(&response).to_string())?)
 
 }
 
-// check book Palmieri
-// external test folder example: https://github.com/awsdocs/aws-doc-sdk-examples/tree/main/rust_dev_preview/s3/tests
-
-
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
-    use aws_sdk_dynamodb::{Client, Config, Credentials, Region};
-    use aws_smithy_client::{erase::DynConnector, test_connection::TestConnection};
-    use aws_smithy_http::body::SdkBody;
-    use std::collections::HashMap;
+
+    const buckets_list = "test1 | test2";
+    const empty_list = "";
+
+    //add S3 client mock and fake the methods used
+    /*#[async_trait]
+    trait TestMethods{
+        async fn list_buckets(){
+
+        }
+
+        async fn send(){
+            
+        }
+    }
+
+    struct S3Buckets{
+
+    }
+
+    impl S3Buckets{
+
+    }*/
 
     // Helper function to create a mock AWS configuration
-    async fn get_mock_config(conn: &TestConnection<SdkBody>) -> Config {
+    async fn get_mock_config() -> Config {
         let cfg = aws_config::from_env()
             .region(Region::new("eu-west-1"))
-            .http_connector(DynConnector::new(conn.clone()))
             .credentials_provider(Credentials::new(
                 "access_key",
                 "privatekey",
@@ -75,59 +90,47 @@ mod tests {
         Config::new(&cfg)
     }
 
-    /// Helper function to generate a sample DynamoDB request
-    fn get_request_builder() -> http::request::Builder {
-        http::Request::builder()
-            .header("content-type", "application/x-amz-json-1.0")
-            .uri(http::uri::Uri::from_static(
-                "https://dynamodb.eu-west-1.amazonaws.com/",
-            ))
+    async fn get_s3_client(config: &Config) -> Client {
+        Client::new(&config);
     }
 
     #[tokio::test]
-    async fn test_put_item() {
-        // Mock DynamoDB client
-        //
-        // `TestConnection` takes a vector of requests and responses, allowing us to
-        // simulate the behaviour of the DynamoDB API endpoint. Since we are only
-        // making a single request in this test, we only need to provide a single
-        // entry in the vector.
-        let conn = TestConnection::new(vec![(
-            get_request_builder()
-                .header("x-amz-target", "DynamoDB_20120810.PutItem")
-                .body(SdkBody::from(
-                    r#"{"TableName":"test","Item":{"id":{"S":"1"},"payload":{"S":"test1"}}}"#,
-                ))
-                .unwrap(),
-            http::Response::builder()
-                .status(200)
-                .body(SdkBody::from(
-                    r#"{"Attributes": {"id": {"S": "1"}, "payload": {"S": "test1"}}}"#,
-                ))
-                .unwrap(),
-        )]);
-        let client = Client::from_conf(get_mock_config(&conn).await);
-
-        let table_name = "test_table";
-
-        // Mock API Gateway request
-        let mut path_parameters = HashMap::new();
-        path_parameters.insert("id".to_string(), vec!["1".to_string()]);
-
-        let request = http::Request::builder()
-            .method("PUT")
-            .uri("/1")
-            .body(Body::Text("test1".to_string()))
-            .unwrap()
-            .with_path_parameters(path_parameters);
-
+    async fn test_handler_200_populated() {
+        const client = get_s3_client(get_mock_config());
         // Send mock request to Lambda handler function
-        let response = put_item(&client, table_name, request)
+        let response = handler(&client)
             .await
             .unwrap();
         
-        // Assert that the response is correct
+        // Assert that the response is 200 and returns the list of buckets
         assert_eq!(response.status(), 200);
-        assert_eq!(response.body(), &Body::Text("item saved".to_string()));
+        assert_eq!(response.body(), &Body::Text(&response_body));
     }
-}*/
+
+    #[tokio::test]
+    async fn test_handler_200_empty() {
+        const client = get_s3_client(get_mock_config());
+        // Send mock request to Lambda handler function
+        let response = handler(&client)
+            .await
+            .unwrap();
+        
+        // Assert that the response is 200 and returns an empty buckets list
+        assert_eq!(response.status(), 200);
+        assert_eq!(response.body(), &Body::Text(&empty_list));
+    }
+
+    #[tokio::test]
+    async fn test_handler_500() {
+        const client = get_s3_client(get_mock_config());
+        // Send mock request to Lambda handler function
+        let response = handler(&client)
+            .await
+            .unwrap();
+        
+        // Assert that the response is 500 and the body text returns the right error msg
+        assert_eq!(response.status(), 500);
+        assert_eq!(response.body(), &Body::Text("s3 call failed".into()));
+    }
+
+}

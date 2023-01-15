@@ -8,6 +8,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = "0.1.61"
 aws-config = "0.52.0"
 aws-sdk-s3 = "0.22.0"
 aws-smithy-client = { version = "0.53.0", features = ["test-util"] }
