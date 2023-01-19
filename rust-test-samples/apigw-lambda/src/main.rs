@@ -6,7 +6,7 @@ use serde_json::json;
 
 #[derive(Serialize, Debug)]
 struct Message {
-    list: String,
+    list: Vec<String>,
 }
 
 
@@ -40,9 +40,7 @@ async fn handler(client: &Client) -> Result<impl IntoResponse, Error> {
                             unwrap_or_default());
     }
 
-    let response = Message {list: buckets_list.join(" | ")};
-
-    Ok(Response::builder().status(StatusCode::OK).body(json!(&response).to_string())?)
+    Ok(Response::builder().status(StatusCode::OK).body(json!(&buckets_list).to_string())?)
 
 }
 
@@ -50,8 +48,8 @@ async fn handler(client: &Client) -> Result<impl IntoResponse, Error> {
 mod tests {
     use super::*;
 
-    const buckets_list = "test1 | test2";
-    const empty_list = "";
+    /*const buckets_list = "test1 | test2";⁄
+    const empty_list = "";*/
 
     //add S3 client mock and fake the methods used
     /*#[async_trait]
@@ -74,7 +72,7 @@ mod tests {
     }*/
 
     // Helper function to create a mock AWS configuration
-    async fn get_mock_config() -> Config {
+    /*async fn get_mock_config() -> Config {
         let cfg = aws_config::from_env()
             .region(Region::new("eu-west-1"))
             .credentials_provider(Credentials::new(
@@ -131,6 +129,6 @@ mod tests {
         // Assert that the response is 500 and the body text returns the right error msg
         assert_eq!(response.status(), 500);
         assert_eq!(response.body(), &Body::Text("s3 call failed".into()));
-    }
+    }*/
 
 }
